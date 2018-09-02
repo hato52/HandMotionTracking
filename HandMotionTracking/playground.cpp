@@ -1,61 +1,34 @@
-//実験用環境
-
-#include "stdafx.h"
+#include <librealsense2/rs.hpp>
 #include <opencv2/opencv.hpp>
-#include <librealsense2/rs.hpp>		//基本的な関数群
-#include <librealsense2/rsutil.h>	//マッピング用の関数群
-#include <iostream>
-
 
 using namespace std;
-using namespace cv;
 
-int main()
-{
-	//Contruct a pipeline which abstracts the device
+int main() {
+	//デバイスを抽象化するパイプラインを構築
 	rs2::pipeline pipe;
 
-	//Create a configuration for configuring the pipeline with a non default profile
+	//パイプラインの設定
 	rs2::config cfg;
 
-	//Add desired streams to configuration
+	//明示的にストリームを有効化する
+	//640×480のカラーストリーム画像を、BGR8フォーマット、30fpsで取得するように設定
 	cfg.enable_stream(RS2_STREAM_COLOR, 640, 480, RS2_FORMAT_BGR8, 30);
-	cfg.enable_stream(RS2_STREAM_INFRARED, 640, 480, RS2_FORMAT_Y8, 30);
-	cfg.enable_stream(RS2_STREAM_DEPTH, 640, 480, RS2_FORMAT_Z16, 30);
 
-	//Instruct pipeline to start streaming with the requested configuration
+	//設定を適用してパイプラインストリーミングを開始
 	pipe.start(cfg);
 
-	// Camera warmup - dropping several first frames to let auto-exposure stabilize
-	rs2::frameset frames;
-
 	while (true) {
-		//Wait for all configured streams to produce a frame
-		frames = pipe.wait_for_frames();
+		//ストリームがフレームセットを取得するまで待機
+		rs2::frameset frames = pipe.wait_for_frames();
 
-		//align処理
-		rs2::align align(RS2_STREAM_COLOR);
-		auto aligned_frames = align.process(frames);
+		//フレームセットからカラーフレームを取得
+		rs2::frame color = frames.get_color_frame();
 
-		//Get each frame
-		rs2::frame color_frame = frames.get_color_frame();
-		//rs2::frame ir_frame = aligned_frames.get_infrared_frame();
-		rs2::depth_frame depth_frame = aligned_frames.get_depth_frame();
+		//カラーフレームから、OpenCVのMatを作成
+		cv::Mat frame(cv::Size(640, 480), CV_8UC3, (void*)color.get_data(), cv::Mat::AUTO_STEP);
 
-		// Creating OpenCV matrix from IR image
-		Mat color(Size(640, 480), CV_8UC3, (void*)color_frame.get_data(), Mat::AUTO_STEP);
-		Mat depth(Size(640, 480), CV_8UC1, (void*)depth_frame.get_data(), Mat::AUTO_STEP);
-
-		// Apply Histogram Equalization
-		//equalizeHist(ir, i);
-		//applyColorMap(ir, ir, COLORMAP_JET);
-
-		// Display the image in GUI
-		//namedWindow("IR Image", WINDOW_AUTOSIZE);
-		namedWindow("Color Image", WINDOW_AUTOSIZE);
-		//imshow("IR Image", ir);
-		imshow("Depth Image", depth);
-		imshow("Color Image", color);
+		//画像を表示
+		cv::imshow("window", frame);
 
 		//qを押すと終了
 		int key = cv::waitKey(1);
@@ -63,6 +36,9 @@ int main()
 			break;
 		}
 	}
-		
+
+	//全てのウィンドウを閉じる
+	cv::destroyAllWindows();
+
 	return 0;
 }
