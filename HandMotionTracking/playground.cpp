@@ -1,44 +1,39 @@
-#include <librealsense2/rs.hpp>
+#include <iostream>
 #include <opencv2/opencv.hpp>
+#include <librealsense2/rs.hpp>
 
-using namespace std;
+void main() {
 
-int main() {
-	//デバイスを抽象化するパイプラインを構築
-	rs2::pipeline pipe;
-
-	//パイプラインの設定
+	rs2::colorizer c;
+	rs2::pipeline p;
 	rs2::config cfg;
-
-	//明示的にストリームを有効化する
-	//640×480のカラーストリーム画像を、BGR8フォーマット、30fpsで取得するように設定
+	cfg.enable_stream(RS2_STREAM_DEPTH, 640, 480, RS2_FORMAT_Z16, 30);
 	cfg.enable_stream(RS2_STREAM_COLOR, 640, 480, RS2_FORMAT_BGR8, 30);
 
-	//設定を適用してパイプラインストリーミングを開始
-	pipe.start(cfg);
+	p.start(cfg);
 
 	while (true) {
-		//ストリームがフレームセットを取得するまで待機
-		rs2::frameset frames = pipe.wait_for_frames();
+		rs2::frameset frames = p.wait_for_frames();
 
-		//フレームセットからカラーフレームを取得
+		rs2::align align(RS2_STREAM_COLOR);
+		auto aligned_frames = align.process(frames);
+
 		rs2::frame color = frames.get_color_frame();
+		rs2::frame depth = aligned_frames.get_depth_frame();
 
-		//カラーフレームから、OpenCVのMatを作成
-		cv::Mat frame(cv::Size(640, 480), CV_8UC3, (void*)color.get_data(), cv::Mat::AUTO_STEP);
+		if (!depth) continue;
 
-		//画像を表示
-		cv::imshow("window", frame);
+		cv::Mat color_image(cv::Size(640, 480), CV_8UC3, (void*)color.get_data(), cv::Mat::AUTO_STEP);
+		cv::Mat depth_image(cv::Size(640, 480), CV_8UC3, (void*)depth.get_data(), cv::Mat::AUTO_STEP);
 
-		//qを押すと終了
+		cv::imshow("color", color_image);
+		cv::imshow("depth", depth_image);
+
 		int key = cv::waitKey(1);
 		if (key == 113) {
 			break;
 		}
 	}
 
-	//全てのウィンドウを閉じる
 	cv::destroyAllWindows();
-
-	return 0;
 }
